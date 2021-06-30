@@ -12,18 +12,15 @@ logger = logging.getLogger("sagah")
 class SagaFailed(Exception):
     """Raised when a saga fails"""
 
-    def __init__(self, transaction: "SagaTransaction", exception: Exception) -> None:
+    def __init__(self, transaction: "SagaTransaction") -> None:
         """Initializes the SagaFailed exception
 
         Args:
             transaction: Saga transaction that failed
-            exception: Base exception that caused the failure
 
         """
         self.transaction = transaction
-        self.exception = exception
-        message = f"Saga failed: {str(exception)}"
-        super().__init__(message)
+        self.message = "Saga failed"
 
 
 class SagaTransaction:
@@ -45,6 +42,10 @@ class SagaTransaction:
         self.action = action
         self.compensator = compensator
         self.name = name
+
+    def __str__(self) -> str:
+        """String representation of the SagaTransaction"""
+        return f'{self.__class__.__name__}(name="{self.name}")'
 
     def _log(self, message: str, level: str = "INFO") -> None:
         """Log a message for the transaction
@@ -112,7 +113,7 @@ class Saga:
         """
         logger.log(getattr(logging, level), f"[saga={self.saga_id}] {message}")
 
-    def __enter__(self) -> None:
+    def __enter__(self) -> "Saga":
         """Entering the context returns the saga"""
         self._log("Entering saga")
         return self
@@ -138,12 +139,16 @@ class Saga:
     async def action(
         self, action: Callable, compensator: Callable, name: Optional[str] = None
     ) -> Any:
-        """Trigger an action and, if successful, register a compensator function
+        """Trigger an action
+
+        If the action succeeds, register the transaction for a potential rollback in the
+        future.
 
         Args:
             action: Function that represents the desired action
             compensator: Function that is used to compensenate, or rollback, the action
-            name: Optional name to identify the action
+            name: Optional name to identify the action. Will default to
+                auto-incrementing integer.
 
         Raises:
             :py:exc:`SagaFailed`: if the action fails
@@ -161,7 +166,7 @@ class Saga:
             result = await tx.call_action()
         except Exception as e:
             await self.rollback()
-            raise SagaFailed(tx, e)
+            raise SagaFailed(tx) from e
         else:
             self._transactions.append(tx)
             return result
