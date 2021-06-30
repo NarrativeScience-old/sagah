@@ -20,7 +20,50 @@ pip install sagah
 
 ## Guide
 
-<!-- Subsections explaining how to use the package -->
+Example usage:
+
+```python
+from sagah import Saga
+
+state = {"counter": 0}
+
+def incr():
+    state["counter"] += 1
+
+def decr():
+    state["counter"] -= 1
+
+with Saga() as saga:
+    await saga.action(incr, decr)
+    await saga.action(incr, decr)
+
+assert state["counter"] == 2
+```
+
+If some action fails, the compensating functions from previous transactions will be called to restore the state:
+
+```python
+from sagah import Saga
+
+state = {"counter": 0}
+
+def incr():
+    state["counter"] += 1
+
+def decr():
+    state["counter"] -= 1
+
+def fail():
+    raise ValueError("oops")
+
+try:
+    with Saga() as saga:
+        await saga.action(incr, decr)
+        await saga.action(incr, decr)
+        await saga.action(fail, noop)
+except Exception:
+    assert state["counter"] == 0
+```
 
 ## Development
 
