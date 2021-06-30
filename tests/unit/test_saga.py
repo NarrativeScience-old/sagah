@@ -11,7 +11,7 @@ def noop():
 
 
 @pytest.mark.asyncio
-async def test_basic__success():
+async def test_sync__success():
     """Should work with basic sync actions"""
     state = {"counter": 0}
 
@@ -29,7 +29,7 @@ async def test_basic__success():
 
 
 @pytest.mark.asyncio
-async def test_basic__rollback():
+async def test_sync__rollback():
     """Should rollback basic sync actions"""
     state = {"counter": 0}
 
@@ -40,6 +40,47 @@ async def test_basic__rollback():
         state["counter"] -= 1
 
     def fail():
+        raise ValueError("oops")
+
+    try:
+        with Saga() as saga:
+            await saga.action(incr, decr)
+            await saga.action(incr, decr)
+            await saga.action(fail, noop)
+    except Exception:
+        assert state["counter"] == 0
+
+
+@pytest.mark.asyncio
+async def test_async__success():
+    """Should work with basic async actions"""
+    state = {"counter": 0}
+
+    async def incr():
+        state["counter"] += 1
+
+    async def decr():
+        state["counter"] -= 1
+
+    with Saga() as saga:
+        await saga.action(incr, decr)
+        await saga.action(incr, decr)
+
+    assert state["counter"] == 2
+
+
+@pytest.mark.asyncio
+async def test_async__rollback():
+    """Should rollback basic async actions"""
+    state = {"counter": 0}
+
+    async def incr():
+        state["counter"] += 1
+
+    async def decr():
+        state["counter"] -= 1
+
+    async def fail():
         raise ValueError("oops")
 
     try:
